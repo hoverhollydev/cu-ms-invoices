@@ -1,0 +1,180 @@
+# DEPLOYMENT: Crea y gestiona múltiples réplicas de pods
+# - Asegura que siempre haya N pods ejecutándose
+# - Si un pod falla, automáticamente crea uno nuevo
+# - Permite actualizaciones sin downtime
+apiVersion: apps/v1
+kind: Deployment  
+metadata:
+  #namespace: jp anterior 
+  namespace: hoverdev-dev #namespace donde se desplegar en openshift redhat
+  #name: microservicio anterior
+  name: cu-ms-invoices
+  labels:
+    app: cu-ms-invoices
+    areanegocio: pagos
+spec:
+  # Número de réplicas (pods) que debe mantener activos esto deja de tener importacia cuando se configura el objeto HorizontalPodAutoscaler
+  replicas: 1
+  # Selector para identificar qué pods gestiona este deployment
+  selector:
+    matchLabels:
+      app: cu-ms-invoices
+  # Plantilla para crear nuevos pods
+  template:
+    metadata:
+      labels:
+        app: cu-ms-invoices
+    spec:
+      containers:
+        - name: cu-ms-invoices
+          # Imagen Docker a utilizar
+          image: hoverdev/cu-ms-invoices:{{ imageTag }}
+          ports:
+            # Puerto en el que escucha la aplicación dentro del contenedor
+            - containerPort: 3000
+          # Recursos mínimos garantizados al pod
+          resources:
+            requests:
+              cpu: 100m           # 100 milicores (0.1 CPU)
+              memory: 256Mi       # 256 Megabytes
+            # Recursos máximos permitidos al pod
+            limits:
+              cpu: 300m           # 300 milicores (0.3 CPU)
+              memory: 512Mi       # 512 Megabytes
+          startupProbe:
+            #puede ser comando
+            #exec:
+            #  command:
+            #    - cat
+            #    - /tmp/healthy   
+            #puede ser httpget       
+            httpGet:
+              path: /startup
+              port: 3000
+            feilureThreshold: 3
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+            inicialDelaySeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 3000
+            feilureThreshold: 3
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+            inicialDelaySeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 3000
+            feilureThreshold: 3
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+            inicialDelaySeconds: 5
+          # Cargar variables de entorno desde ConfigMap
+          envFrom:
+            - configMapRef:
+                name: cu-ms-invoices
+            - secretRef:
+                name: cu-ms-invoices
+            #- configMapRef:
+            #    name: superconfigmap
+            #- secretRef:
+            #    name: supersecreto
+---
+# SERVICE: Expone los pods a nivel de red
+# - Proporciona una IP estable para acceder a los pods
+# - Balancea carga entre los 3 pods del deployment
+# - Permite comunicación intra-cluster y externa
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: hoverdev-dev
+  name: cu-ms-invoices
+spec:
+  # Selecciona qué pods exponer (los que tengan label app: microservicio)
+  selector:
+    app: cu-ms-invoices
+  ports:
+    # Protocolo de transporte
+    - protocol: TCP
+      # Puerto del servicio (acceso externo)
+      port: 3000
+      # Puerto del pod (acceso interno)
+      targetPort: 3000
+---
+# CONFIGMAP: Almacena configuración en pares clave-valor
+# - No sensible (visible en etcd sin encripción)
+# - Se inyecta como variables de entorno en los pods
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: hoverdev-dev
+  name: cu-ms-invoices
+data:
+  LOG_LEVEL: "debug"
+---
+# SECRET: Almacena datos sensibles (contraseñas, tokens, etc.)
+# - Base64 codificado (no es encripción real, solo ofuscación)
+# - Se inyecta como variables de entorno en los pods
+# - DATABASE_PASSWORD decodificado: SuperSeguro2025
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: hoverdev-dev
+  name: cu-ms-invoices
+data:
+  DATABASE_PASSWORD: U3VwZXJTZWd1cm8yMDI1
+---
+# HORIZONTALPODAUTOSCALER: Escala automáticamente los pods
+# - Aumenta pods si el CPU supera el 70%
+# - Disminuye pods si baja del 70%
+# - Mantiene entre 3 y 10 pods
+# - Necesita Metrics Server instalado en el cluster
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cu-ms-invoices
+spec:
+  # Deployment a monitorear
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: cu-ms-invoices
+  # Rango de réplicas permitidas
+  minReplicas: 2          # Mínimo 2 pods
+  maxReplicas: 6         # Máximo 6 pods
+  # Métricas para el autoscaling
+  metrics:
+    # Basado en uso de CPU
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization # EN BASE AL REQUEST
+          averageUtilization: 90    # Escala cuando CPU > 90%
+    # Basado en uso de Memoria
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 90    # Escala cuando Memoria > 90%
+  # Comportamiento de escalado
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Espera 5 min antes de bajar
+      policies:
+        - type: Percent
+          value: 50                     # Reduce 50% de pods
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0    # Sube inmediatamente
+      policies:
+        - type: Percent
+          value: 100                    # Suma 100% más pods
+          periodSeconds: 30
+---
