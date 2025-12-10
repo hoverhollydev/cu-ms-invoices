@@ -1,17 +1,14 @@
 # IMAGEN BASE
-FROM python:3.11-alpine
- 
-# INSTRUCCIONES
+FROM python:3.11-slim
+
 WORKDIR /app
 
-# Instalar Flask
-RUN pip install flask
+# Instalar dependencias necesarias
+RUN pip install requests
 
-# Copiar el archivo de la aplicación
+# Copiar archivo
 COPY app.py .
 
-# Exponer el puerto 3000
 EXPOSE 3000
- 
-# ENTRYPOINT
+
 CMD ["python", "app.py"]
