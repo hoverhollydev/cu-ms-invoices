@@ -1,4 +1,3 @@
----
 # Permitir SOLO que invoices hable con payments en el puerto 3000
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
