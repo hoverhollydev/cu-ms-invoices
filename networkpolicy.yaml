@@ -5,7 +5,7 @@ metadata:
   name: allow-invoices-to-payments
   namespace: hoverdev-dev
 spec:
-  podSelector:        # Pod al que se está protegiendo → payments
+  podSelector:  # Pod al que se está protegiendo → payments
     matchLabels:
       app: cu-ms-payments
   ingress:
