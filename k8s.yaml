@@ -116,6 +116,7 @@ metadata:
   name: cu-ms-invoices
 data:
   LOG_LEVEL: "debug"
+  PAYMENTS_URL: "http://cu-ms-payments.hoverdev-dev.svc.cluster.local:3000/users"
 ---
 # SECRET: Almacena datos sensibles (contraseñas, tokens, etc.)
 # - Base64 codificado (no es encripción real, solo ofuscación)

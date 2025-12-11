@@ -1,0 +1,22 @@
+---
+# Permitir SOLO que invoices hable con payments en el puerto 3000
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-invoices-to-payments
+  namespace: hoverdev-dev
+spec:
+  podSelector:        # Pod al que se está protegiendo → payments
+    matchLabels:
+      app: cu-ms-payments
+  ingress:
+    - from:
+        - podSelector:   # Quién puede hablarle → invoices
+            matchLabels:
+              app: cu-ms-invoices
+      ports:
+        - protocol: TCP
+          port: 3000
+  policyTypes:
+    - Ingress
+---

@@ -44,3 +44,8 @@ jobs:
         run: |
           sed 's/{{ imageTag }}/${{ github.run_number }}/g' k8s.yaml > k8s.resolved.yaml
           oc apply -f k8s.resolved.yaml
+      
+      - name: Apply NetworkPolicy
+        run: |
+          echo "Applying NetworkPolicy allow-invoices-to-payments..."
+          oc apply -f networkpolicy.yaml
