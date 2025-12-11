@@ -1,17 +1,14 @@
-# IMAGEN BASE
 FROM python:3.11-slim
- 
-# INSTRUCCIONES
+
 WORKDIR /app
 
-# Instalar Flask
-RUN pip install psycopg2-binary
+# Copiar dependencias primero (para aprovechar cache)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar el archivo de la aplicación
+# Copiar código
 COPY app.py .
 
-# Exponer el puerto 3000
 EXPOSE 3000
- 
-# ENTRYPOINT
+
 CMD ["python", "app.py"]

@@ -1,1 +1,4 @@
-Van todas la librerias 
+#Van todas la librerias 
+psycopg2-binary
+requests
+flask
