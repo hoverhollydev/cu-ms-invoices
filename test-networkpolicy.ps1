@@ -2,86 +2,77 @@
 # Test de NetworkPolicy
 # =========================
 
-# ⚠️ IMPORTANTE:
-# Para que esta prueba de NetworkPolicy funcione correctamente,
-# es OBLIGATORIO eliminar la NetworkPolicy "allow-same-namespace".
-#
-# Dicha policy permite todo el tráfico entre los pods del namespace,
-# lo que provoca que incluso los pods NO permitidos reciban HTTP 200.
-#
-# Si no se elimina, esta prueba SIEMPRE dará 200 aunque la NetworkPolicy
-# esté correctamente configurada.
-#
-# Comando para eliminarla:
-# oc delete networkpolicy allow-same-namespace -n hoverdev-dev
+# IMPORTANTE:
+# Si el test desde el pod NO permitido devuelve HTTP 200,
+# significa que la NetworkPolicy "allow-same-namespace"
+# sigue permitiendo el tráfico.
 
-# -------------------------
-# Variables
-# -------------------------
 $namespace     = "hoverdev-dev"
 $allowedLabel  = "app=cu-ms-invoices"
 $targetService = "cu-ms-payments"
 $targetPort    = 3000
 
 Write-Host "============================================"
-Write-Host " Test NetworkPolicy: $allowedLabel ➜ $targetService:$targetPort"
-Write-Host " Namespace: $namespace"
-Write-Host "============================================`n"
+Write-Host " Test NetworkPolicy"
+Write-Host " Allowed label : $allowedLabel"
+Write-Host " Target        : ${targetService}:${targetPort}"
+Write-Host " Namespace     : $namespace"
+Write-Host "============================================"
+Write-Host ""
 
 # -------------------------
-# 1️⃣ Test desde pods PERMITIDOS
+# 1) Pods PERMITIDOS
 # -------------------------
-Write-Host "▶ Probando desde pods PERMITIDOS (cu-ms-invoices)`n"
+Write-Host "[1] Probando desde pods PERMITIDOS"
+Write-Host ""
 
 $allowedPods = oc get pods -n $namespace -l $allowedLabel -o jsonpath='{.items[*].metadata.name}' | Out-String
 $allowedPods = $allowedPods -split "\s+"
 
 foreach ($pod in $allowedPods) {
     if ($pod) {
-        Write-Host "[+] Pod permitido: $pod"
+        Write-Host "  Pod permitido: $pod"
 
-        try {
-            $status = oc exec -n $namespace $pod -- `
-                python -c "import requests; print(requests.get('http://${targetService}:${targetPort}/users').status_code)"
+        $status = oc exec -n $namespace $pod -- `
+            python -c "import requests; print(requests.get('http://${targetService}:${targetPort}/users').status_code)"
 
-            Write-Host "    ✅ HTTP $status (PERMITIDO)" -ForegroundColor Green
-        }
-        catch {
-            Write-Host "    ❌ ERROR inesperado: $_" -ForegroundColor Red
-        }
+        Write-Host "    HTTP status: $status (OK)"
     }
 }
 
 # -------------------------
-# 2️⃣ Test desde pod NO PERMITIDO
+# 2) Pod NO PERMITIDO
 # -------------------------
-Write-Host "`n▶ Probando desde pod NO PERMITIDO (temporal)`n"
+Write-Host ""
+Write-Host "[2] Probando desde pod NO PERMITIDO (temporal)"
+Write-Host ""
 
-try {
-    $result = oc run test-pod `
-        --rm -i --tty `
-        --image=curlimages/curl `
-        --restart=Never `
-        -n $namespace `
-        -- sh -c "curl -s -o /dev/null -w '%{http_code}' http://${targetService}:${targetPort}/users"
+$result = oc run test-pod `
+    --rm -i --tty `
+    --image=curlimages/curl `
+    --restart=Never `
+    -n $namespace `
+    -- sh -c "curl -s -o /dev/null -w '%{http_code}' http://${targetService}:${targetPort}/users"
 
-    if ($result -eq "200") {
-        Write-Host "    ❌ HTTP 200 (NO debería pasar)" -ForegroundColor Red
-        Write-Host "    🔥 NetworkPolicy NO está funcionando correctamente"
-    }
-    else {
-        Write-Host "    ✅ HTTP $result (BLOQUEADO correctamente)" -ForegroundColor Green
-        Write-Host "    🔐 NetworkPolicy funcionando correctamente"
-    }
+# 🔑 CLAVE: usar -match
+if ($result -match "200") {
+    Write-Host "    RESULTADO: HTTP 200" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "    ADVERTENCIA: Trafico permitido desde pod NO autorizado"
+    Write-Host ""
+    Write-Host "    CAUSA:"
+    Write-Host "    La NetworkPolicy 'allow-same-namespace' none sigue activa que viene por defecto OpenShift crea automaticamente. "
+    Write-Host ""
+    Write-Host "    ACCION REQUERIDA:"
+    Write-Host "    Para que funcione en un namaspace y no se cominiquen entro todos los pods Ejecuta:"
+    Write-Host ""
+    Write-Host "      oc delete networkpolicy allow-same-namespace -n $namespace" -ForegroundColor Cyan 
 }
-catch {
-    Write-Host "    ✅ Conexión BLOQUEADA (timeout / conexión rechazada)" -ForegroundColor Green
-    Write-Host "    🔐 NetworkPolicy funcionando correctamente"
+else {
+    Write-Host "    RESULTADO: HTTP bloqueado correctamente" -ForegroundColor Green
 }
 
-# -------------------------
-# Fin
-# -------------------------
-Write-Host "`n============================================"
+Write-Host ""
+Write-Host "============================================"
 Write-Host " Fin de la prueba de NetworkPolicy"
 Write-Host "============================================"
