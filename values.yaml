@@ -1,0 +1,30 @@
+# Helm values for cu-ms-invoices
+# Chart: hoverdev/helm-microservice-chart
+
+# Configuración básica
+name: cu-ms-invoices
+namespace: hoverdev-dev
+
+# Imagen Docker
+registry: hoverdev
+image: cu-ms-invoices
+imageTag: "1" # será sobrescrito por el pipeline con --set imageTag=<run_number>
+
+# Puerto del contenedor / servicio
+port: 3000
+
+# Variables de entorno (ConfigMap)
+configMap:
+  LOG_LEVEL: "debug"
+  PAYMENTS_URL: "http://cu-ms-payments.hoverdev-dev.svc.cluster.local:3000/users"
+
+# Secrets (valores en base64)
+secret:
+  DATABASE_PASSWORD: U3VwZXJTZWd1cm8yMDI1
+
+# Horizontal Pod Autoscaler
+hpa:
+  minReplicas: 2
+  maxReplicas: 6
+  cpuUtilization: 90
+  memoryUtilization: 90

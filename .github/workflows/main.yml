@@ -40,10 +40,14 @@ jobs:
         run: |
           oc login --token=${{ secrets.OPENSHIFT_TOKEN }} --server=${{ secrets.OPENSHIFT_SERVER }}
 
-      - name: Deploy to OpenShift
+      - name: Deploy with Helm
         run: |
-          sed 's/{{ imageTag }}/${{ github.run_number }}/g' k8s.yaml > k8s.resolved.yaml
-          oc apply -f k8s.resolved.yaml
+          helm upgrade --install cu-ms-payments \
+            oci://registry-1.docker.io/hoverdev/helm-microservice-chart \
+            --version 1.0.9 \
+            -f values.yaml \
+            --set imageTag=${{ github.run_number }} \
+            --namespace hoverdev-dev
     
       - name: Apply NetworkPolicy
         run: |
