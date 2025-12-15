@@ -42,7 +42,7 @@ jobs:
 
       - name: Deploy with Helm
         run: |
-          helm upgrade --install cu-ms-payments \
+          helm upgrade --install cu-ms-invoices \
             oci://registry-1.docker.io/hoverdev/helm-microservice-chart \
             --version 1.0.9 \
             -f values.yaml \
